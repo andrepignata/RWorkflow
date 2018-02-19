@@ -1,0 +1,776 @@
+---
+title: "Aula 3"
+author: "André Pignata"
+date: "6 de Janeiro de 2017"
+output: 
+  ioslides_presentation:
+    widescreen: true
+logo: images/logo.png
+css: rworkflow.css
+#runtime: shiny
+toc: yes
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(cache = F)
+knitr::opts_chunk$set(fig.align = 'center')
+library(jsonlite)
+library(RPostgreSQL)
+library(ggplot2)
+
+con2 <<- dbConnect(PostgreSQL(), user= "usr_usp", password='leitura',  dbname="bases",host="nv1.fearp.usp.br",port='1754')
+
+
+```
+
+## Criando uma tabela para agregarmos{.small}
+* Vamos criar uma tabela 'pronta' para lidarmos com nossos dados
+* Quero uma tabela contendo:
+  + O código, nome e estado do município 
+  + O valor população, em formato numérico, de homens e mulheres residentes, sendo que a variável descrição diferenciará cada tipo de registro
+  * Como podemos obter essa consulta?
+  + pensem nas colunas que queremos
+  + pensem nas tabelas onde elas estão
+  + quais os campos chaves entre essas tabelas
+  + qual o filtro devemos aplicar
+  + qual o tratamento devemos fazer nos campos
+
+## Tabela para agregação
+Passo 1: Determinar quais colunas queremos
+```{r, eval=F}
+select 
+c.codmun, c.nome
+from s3672792.cidades c
+```
+e
+```{r, eval=F}
+select 
+s.descricao, s.valor
+from s3672792.sintese_informacao s
+```
+
+----
+  
+  Passo2: Juntando as tabelas
+```{r, eval=F}
+select 
+c.codmun,c.nome,s.descricao,s.valor
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+```
+
+Passo3: Filtrando 
+```{r, eval=F}
+select 
+c.codmun,c.nome,s.descricao, s.valor
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+where 
+descricao like 'População residente - %'
+```
+
+----
+  
+  Passo4: Tratando os campos:
+```{r, eval=F}
+select 
+c.codmun,c.nome,s.descricao, s.valor::numeric
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+where 
+descricao like 'População residente - %'
+```
+> - ERROR:  invalid input syntax for type numeric: "-"
+
+----
+  
+  Passo4: Tratando os campos:
+```{r, eval=F}
+select 
+c.codmun,c.nome,s.descricao, 
+case when s.valor = '-' then null 
+else s.valor::numeric 
+end as valor
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+where 
+descricao like 'População residente - %'
+```
+> - ERROR:  invalid input syntax for type numeric: "1.304.267"
+
+----
+  
+  Passo4: Tratando os campos:
+```{r, eval=F}
+select 
+c.codmun,c.nome
+,substr(c.nome,strpos(c.nome,'/')+1) as estado
+,s.descricao
+,case 
+when s.valor = '-' then null 
+else replace(s.valor,'.','')::numeric 
+end as valor
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+where 
+descricao like 'População residente - %'
+```
+> - OK :D 
+
+## Tabela para agregação
+> * Pronto! Agora é simples, toda vez que precisarmos utilizar esses dados, basta digitarmos somente essas linhas de código!
+  > * Mentira! Para situações de código mais complexo podemos criar uma View
++ O que é View?
++ Diferença entre View e Tabela
++ Quando usar View e quando usar Tabela
+
+## Criando uma view
+- Para criarmos a view __vpopulacao__:
+  
+```{r, eval=F}
+create view s3672792.vpopulacao as
+select 
+c.codmun,c.nome
+,substr(c.nome,strpos(c.nome,'/')+1) as estado
+,s.descricao
+,case 
+when s.valor = '-' then null 
+else replace(s.valor,'.','')::numeric 
+end as valor
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao s on (c.codmun = s.codmun)
+where 
+descricao like 'População residente - %'
+```  
+
+## Usando a view e voltando ao tema 'Agregação'
+- A view é utilizada como se fosse uma tabela:
+```{r, eval=F}  
+select * from s3672792.vpopulacao
+```
+
+- Voltando a falar em agrupamento
+- Quero verificar todos os estados da minha tabela, ou seja, agrupar os dados por estado:
+```{r, eval=F}  
+select estado from s3672792.vpopulacao group by estado
+```
+
+- Quero fazer uma contagem de quantos registros aparecem por estado:
+```{r, eval=F}  
+select  estado, count(*) from s3672792.vpopulacao group by estado
+```
+
+
+## Agregação
+- Como faço para saber o número total de residentes em cada estado?
+- Basta somar o número de homens e mulheres, agrupado por estado:
+```{r, eval=F}  
+select  estado, sum(valor) as total from s3672792.vpopulacao group by estado
+```
+
+---
+
+- E se eu quiser saber o número de homens e mulheres em cada estado?
+- Se exibirmos o campo descricao, teremos uma diferenciação dos registros:
+```{r, eval=F}  
+select  estado, descricao, sum(valor) from s3672792.vpopulacao 
+group by estado, descricao
+order by estado
+```
+- Perceba, que temos que adicionar todo campo, não agregado no __group by__
+
+## Outras funções de agregação
+- Página do manual do PostgreSQL lista diversas funções de agregação: [https://www.postgresql.org/docs/9.5/static/functions-aggregate.html](https://www.postgresql.org/docs/9.5/static/functions-aggregate.html)
+- Dentre elas, podemos destacar:
+  * avg: Média aritmética da variável (ignorando valores nulos)
+* count: Faz a contagem de registros (ignorando valores nulos)
+* min: Valor mínimo da variável (ignorando valores nulos)
+* max: Valor máximo da variável (ignorando valores nulos)
+* sum: Somatório da variável (ignorando valores nulos)
+* corr(X,Y): Coeficiente de correlação entre dois valores
+* covar_pop/samp(Y,X): Covariância populacional/amostral
+* stddev_pop/samp: Desvio padrão populacional/amostral
+* var_pop/samp: Variância populacional/amostral
+
+## Exemplo de funções de agregação
+```{r, eval=F}
+select estado, descricao
+,avg(valor)
+,count(*)
+,min(valor)
+,max(valor)
+,sum(valor)
+,stddev_pop(valor) 
+,stddev_samp(valor)
+,var_pop(valor)
+,var_samp(valor) 
+from s3672792.vpopulacao
+group by estado, descricao
+```
+
+## Fazendo regressão com SQL{.small}
+- Cuidado para não fugir do escopo que queremos dar ao SQL
+- No SQL preparamos os dados, no R, analisamos os dados
+- Vamos montar uma outra view para exemplificarmos:
+  
+```{r, eval=F}
+create view s3672792.vregressao as
+select 
+c.codmun,c.nome,
+substr(c.nome,strpos(nome,'/')+1) as estado
+,case when spop.valor = '-' then null else replace(spop.valor,'.','')::numeric 
+end as pop_alfabetizada
+,case when smat.valor = '-' then null else replace(smat.valor,'.','')::numeric 
+end as pop_matriculada_em_2015
+from s3672792.cidades c
+left outer join s3672792.sintese_informacao spop 
+on (c.codmun = spop.codmun 
+    and spop.descricao like 'População residente alfabetizada')
+left outer join s3672792.sintese_informacao smat 
+on (c.codmun = smat.codmun 
+    and smat.descricao like 'Matrícula - Ensino médio - 2015')
+
+```
+
+## Fazendo regressão com SQL
+* O PostgreSQL utiliza o método de MQO para fazer a regressão linear
+
+```{r, eval=F}
+select estado
+,corr(v.pop_matriculada_em_2015,v.pop_alfabetizada)
+,covar_pop(v.pop_matriculada_em_2015,v.pop_alfabetizada)
+,regr_intercept(v.pop_matriculada_em_2015,v.pop_alfabetizada)
+,regr_slope(v.pop_matriculada_em_2015,v.pop_alfabetizada)
+,regr_r2(v.pop_matriculada_em_2015,v.pop_alfabetizada)
+from s3672792.vregressao v
+group by estado
+order by estado
+```
+
+* O que obtemos com esses resultados?
+
+> - Sério! O que obtemos? 
+- Eu não sei interpretar esses dados direito, ainda (shame on me)
+
+## Outras funções para manipulação de texto{.small}
+- Algumas funções usadas normalmente para tratar/alterar os dados:
+  + trim: limpa espaços em branco antes e depois de um texto. Ex: trim(' teste ')=='teste'
++ unaccent: remove acentuação de palavras. Ex: unaccent('Ribeirão Preto')=='Ribeirao Preto'
++ strtoupper: transforma o texto em maiúsculas. Ex: unaccent(strtoupper('Ribeirão Preto'))=='RIBEIRAO PRETO'
++ substr: retorna uma parte de uma string (já usamos)
++ strpos: retorna a posição da primeira ocorrência de uma substring dentro de uma string (já usamos)
+- Outras funções podem ser encontradas na página:  [https://www.postgresql.org/docs/9.1/static/functions-string.html](https://www.postgresql.org/docs/9.1/static/functions-string.html) 
+
+
+# Continuação Aula 2
+
+## Eliminando registros em duplicidade (e matando outros coelhos)
+```{r,eval=F}
+
+create table s3672792.sintese_informacao_new as 
+select distinct * from s3672792.sintese_informacao;
+
+delete from  s3672792.sintese_informacao;
+
+insert into s3672792.sintese_informacao
+select * from s3672792.sintese_informacao_new;
+
+drop table s3672792.sintese_informacao_new;
+```
+
+## Criando tabelas a partir de consultas
+  - Quando trabalhamos com dados podemos ter 2 situações:
+    + Os dados são fixos e coletados uma única vez
+    + Os dados são dinâmicos e coletados periodicamente
+  - Quando os dados são fixos, vale a pena alterar a ESTRUTURA da tabela
+  - Quando os dados são dinâmicos, a melhor opção é criar uma tabela intermediária, com os dados tratados
+
+## Alterando a tabela de cidades {.small}
+- Na nossa tabela de cidades, faz sentido criarmos o campo __estado__ e apagarmos o campo __row.names__
+- Vimos que o campo __estado__ foi utilizado em diversas consultas anteriores, portanto é um bom candidato a criação
+- Temos o campo codmun que pode ser nossa __chave primária__ (explicar melhor), portanto, não precisamos do campo __row.names__
+- Vamos realizar essas tarefas com o código:
+  
+```{r, eval=F}
+ALTER TABLE s3672792.cidades DROP COLUMN "row.names"; /*apagando a coluna row.names*/
+ALTER TABLE s3672792.cidades ADD COLUMN estado CHAR(2); /*criando a coluna estado*/
+UPDATE s3672792.cidades SET estado = substr(nome,strpos(nome,'/')+1) /*atualizando a coluna estado*/
+```
+
+
+## Criando tabelas intermediárias{.small}
+- Quando trabalharmos com tabelas que obtemos de outras fontes é melhor criar tabelas intermediárias 
+- Vamos refazer nossa view vregressao e criar uma tabela para deixar os dados pré-processados
+
+---
+  
+```{r, eval=F}
+drop table  s3672792.cidade_sintese;
+create table s3672792.cidade_sintese as
+select distinct c.codmun,c.nome, c.estado
+,case when spop.valor = '-' then null else replace(spop.valor,'.','')::numeric end as pop_alfabetizada
+,case when smat.valor = '-' then null else replace(smat.valor,'.','')::numeric end as pop_matriculada_em_2015
+,case when spoph.valor = '-' then null else replace(spoph.valor,'.','')::numeric end as pop_homens
+,case when spopm.valor = '-' then null else replace(spopm.valor,'.','')::numeric end as pop_mulheres
+,case when sus.valor = '-' then null else replace(sus.valor,'.','')::numeric end as nro_estab_sus
+from s3672792.cidades c left outer join s3672792.sintese_informacao spop 
+on (c.codmun = spop.codmun and spop.descricao = 'População residente alfabetizada')
+left outer join s3672792.sintese_informacao smat 
+on (c.codmun = smat.codmun and smat.descricao = 'Matrícula - Ensino médio - 2015')
+left outer join s3672792.sintese_informacao spoph 
+on (c.codmun = spoph.codmun and spoph.descricao = 'População residente - Homens')
+left outer join s3672792.sintese_informacao spopm 
+on (c.codmun = spopm.codmun and spopm.descricao = 'População residente - Mulheres')
+left outer join s3672792.sintese_informacao sus 
+on (c.codmun = sus.codmun and sus.descricao = 'Estabelecimentos de Saúde SUS')
+```
+
+## Diferenças entre View e Tabelas
+  * Velocidade
+    + select * from vregressao: 82ms
+    + select * from cidade_sintese: 7ms
+  * Periodicidade de mudança dos dados
+
+
+## O que o SQL não faz (tão bem)
+- Pivoteamento
+- Lidar com observações que estão abaixo ou acima
+- Dados não estruturados
+- Tratamento de dados em várias etapas (sub-queries)
+
+## Sub-queries
+- Com SQL temos que ter cuidado com a ordem de execução da consulta
+- A consulta é analisada de 'dentro para fora'.Ex:
+```{r, eval=F}
+select *
+  , c.pop_mulheres+c.pop_homens as pop_total
+, c.pop_alfabetizada/pop_total
+from s3672792.cidade_sintese c
+```
+> - Deu erro! Porque?
+> - Perceba que o erro é: pop_total não existe
+> - A variável só é efetivamente criada APÓS a execução da consulta
+- Como proceder?
+
+## Sub-queries
+
+- Nessas situações devemos fazer nossas consultas em 2 etapas
+
+> - Pensem nisso:
+  - O que o comando __select__ espera após o from?
+- O que o comando __select__ retorna?
+- O que nos impede de passar o retorno de um __select__ como tabela de outro __select__?
+
+```{r, eval=F}
+select *, t1.pop_alfabetizada/pop_total from (
+  select *
+    , c.pop_mulheres+c.pop_homens as pop_total
+  from s3672792.cidade_sintese c
+) as t1
+```
+> - Você pode aninhar quantos níveis quiser, só lembrando de nomear cada um
+
+
+# Análise de dados - Aula 3
+
+## Obtendo os dados
+- Vamos trabalhar com a nossa tabela cidade_sintese
+- Primeiramente, importamos ela para o R
+
+```{r}
+conCurso <<- dbConnect(PostgreSQL(), user= "r_workflow", password="curso",  dbname="r_workflow",host="143.107.205.218",port='5432')
+sSql <- "select * from s3672792.cidade_sintese"
+res <- dbSendQuery(conCurso, sSql)
+dCidade <- fetch(res,n=-1)    
+```  
+
+## Produzindo estatísticas descritivas
+- Podemos verificar os dados de um dataframe com a função summary
+
+```{r}
+summary(dCidade[,1:4])
+```
+
+## Produzindo estatísticas descritivas
+- Podemos obter maiores detalhes com o pacote psych 
+```{r, warning=F}
+library(psych)
+describe(dCidade)
+```
+
+## Produzindo estatísticas descritivas
+- Podemos refinar nossa pesquisa agrupando variáveis de interesse
+```{r, warning=F}
+dTemp <- subset(dCidade[dCidade$estado %in% c('SP','RJ'),])
+describeBy(dTemp[,c('estado','pop_alfabetizada')],group=dTemp$estado)
+```
+
+## Funções estatísticas
+- Também podemos utilizar as funções:
+  * mean
+* sd
+* median
+* min
+* max
+* range
+* skew: viés
+
+## Reshape
+- Com a biblioteca reshape2 podemos transformar facilmente com tabelas em formato longo em formato largo. EX:
+```{r,warning=F}
+  sSql <- "select * from s3672792.sintese_informacao"
+  res <- dbSendQuery(conCurso, sSql)
+  dSintese <- fetch(res,n=-1)    
+  dLargo <- reshape(dSintese[c('codmun','ano','descricao','valor')]
+                  , timevar='descricao',idvar=c('codmun','ano')
+                  ,direction = 'wide'
+                  )
+  #warnings()
+```
+
+## Regressão{.small}
+- A regressão é uma ferramenta bastante utilizada para predição do comportamento das variáveis
+- A mais comumente utilizada é a regressão linear
+- Vejamos o comportamento do Nro de estabelecimentos do SUS em relação à população alfabetizada
+```{r}
+r1 <- lm(dCidade$nro_estab_sus ~ dCidade$pop_alfabetizada)
+r1
+```
+
+## Regressão{.small}
+
+```{r}
+summary(r1)
+```
+
+## Regressão{.small}
+
+```{r}
+plot(nro_estab_sus ~ pop_alfabetizada,data=dCidade) 
+abline(r1)
+```
+
+## Regressão{.small}
+
+```{r}
+dTemp <- dCidade[dCidade$pop_alfabetizada<500000,]
+plot(nro_estab_sus ~ pop_alfabetizada,data=dTemp) 
+abline(lm(dTemp$nro_estab_sus ~dTemp$pop_alfabetizada))
+```
+
+## Regressão{.small}
+- Podemos também fazer uma regressão com mais de uma variável explicativa
+
+```{r}
+r2 <- lm(dTemp$nro_estab_sus ~dTemp$pop_alfabetizada+dTemp$pop_homens+dTemp$pop_mulheres)
+summary(r2)
+```
+
+## Regressão{.small}
+```{r}
+par(mfrow = c(2, 2))
+plot(r2)
+```
+
+## Regressão Logit
+- Para a regressão Logit, precisamos ter uma variável categórica ou binária
+- Para nosso exemplo, vamos criar uma variável que será 1 se a cidade tiver mais de 80% da 
+população alfabetizada, 0 caso contrário
+```{r}
+dCidade$mais_de_80perc <- 0
+dCidade$mais_de_80perc[dCidade$pop_alfabetizada/(dCidade$pop_homens+dCidade$pop_mulheres) > 0.8] <- 1
+```
+
+## Regressão Logit
+- Agora, vamos analisar o comportamento desta variável em relação ao número de estabelecimentos do SUS
+
+```{r}
+g1 <- glm(mais_de_80perc ~ nro_estab_sus, data=dCidade, family = "binomial")
+summary(g1)
+```
+
+## Regressão Logit
+- Plotando o resultado
+```{r}
+par(mfrow = c(2, 2))
+plot(g1)
+```
+
+## Análise das regressões
+- Intervalo de confiança
+```{r}
+confint(g1)
+confint(r2)
+```
+
+## Análise das regressões
+- Coeficientes
+```{r}
+coefficients(r2)
+head(residuals(r2))
+```
+
+## Análise das regressões
+- teste t
+```{r}
+t.test(dCidade$nro_estab_sus,dCidade$pop_alfabetizada)
+```
+
+## Análise das regressões
+- Prevendo o valor do número de estabelecimentos do SUS, de acordo com a população alfabetizada
+```{r}
+r1 <- lm(nro_estab_sus ~ pop_alfabetizada, data=dCidade)
+dPopAlfabetizada <- data.frame(pop_alfabetizada=100000)
+#dCidade$estimativa <-  
+predict(r1,dPopAlfabetizada, interval="predict")
+```
+
+## Análise das regressões
+- teste ANOVA
+
+```{r}
+anova(r2, test="Chisq")
+```
+
+## Análise com particionamentos (clusters)
+- Podemos agrupar nossos dados com a utilização do método k-means
+```{r,warning=F,fig.height=2.5}
+dTemp <- na.omit(dCidade)
+dTemp <- dTemp[dTemp$nro_estab_sus < 60,]
+fit <- kmeans(dTemp[,c('nro_estab_sus','pop_alfabetizada')], 5)
+fit$cluster <- as.factor(fit$cluster)
+ggplot(dTemp,aes(x=nro_estab_sus,y=pop_alfabetizada,color=fit$cluster))+
+  geom_point()
+
+```
+
+# Gráficos
+
+## O pacote ggplot2
+- O pacote ggplot (e agora sua versão mais nova ggplot2) vem se consolidando como um dos pacotes mais usados para geração de gráficos
+- Bastante flexível
+- Poderoso
+- Muito personalizável
+- Bonito!
+  - Coisas que não deveriam ser feitas com ggplot:
+  + Gráficos 3D (pacote rgl)
++ Grafos (pacote igraph)
++ Gáficos interativos (pacote ggvis e shiny)
+
+## A gramática dos gráficos
+- Para criarmos gráficos criamos __blocos__ de sintaxe e juntamos
++ Vamos brincar de lego?
+- Quais são os blocos com os quais podemos trabalhar:
+  + Dados
++ Mapeamento estético 
++ Objetos geométricos 
++ Transformações estatíticas
++ Escalas
++ Sistema de coordenadas
++ Ajustes de posição
+- O curso será focado 'apenas' em Dados e Mapeamento estético
+
+
+## Histograma{.small}
+- Podemos plotar facilmente um histograma em R com a função hist()
+
+```{r, fig.width=6, fig.align='center',fig.height=3.5}
+
+hist(dCidade[dCidade$nro_estab_sus < 60,c('nro_estab_sus')],
+     main = 'Distribuição de cidades com menos de 60 estabelecimentos do SUS'
+     ,xlab = 'Nro de estabelecimentos', ylab='Frequência'
+)
+```
+
+## Histograma{.small}
+- Com ggplot2
+```{r, fig.align='center',warning=F,fig.height=3.5}
+library(ggplot2)
+ggplot(data=subset(dCidade,nro_estab_sus<60), aes(x = nro_estab_sus)) +
+  geom_histogram(binwidth=1)
+```
+
+##Gráfico de barras
+- Como seria um gráfico de barras mostrando a distribuição entre homens e mulheres em cada estado?
+- Para isso, vamos montar uma nova consulta
+
+```{r}
+sSql <- "select c.estado, s.descricao, 
+sum(case when valor = '-' then 0 else replace(valor,'.','')::numeric end) as valor
+from s3672792.cidades c
+inner join s3672792.sintese_informacao  s on (c.codmun = s.codmun)
+where
+s.descricao = 'População residente - Mulheres' 
+or
+s.descricao = 'População residente - Homens'
+group by estado,descricao"
+res <- dbSendQuery(conCurso, sSql)
+dBarra <- fetch(res,n=-1)    
+```
+
+---
+  
+```{r,fig.align='center',fig.width=10}
+options(scipen=999)  
+ggplot(data=dBarra) +
+  geom_bar(aes(x = estado,y=valor, fill=descricao),stat = "identity")
+```
+
+---
+  
+```{r,fig.align='center',fig.width=10}
+ggplot(data=dBarra) +
+  geom_bar(aes(x = estado,y=valor, fill=descricao),stat = "identity",position = 'dodge')
+```
+
+
+
+## Scatterplot
+```{r}
+
+ggplot(data=subset(dCidade,nro_estab_sus<60), aes(x = nro_estab_sus, y = pop_homens)) +
+  geom_point()
+```
+
+## Scatterplot
+- Vamos adicionar a série de população de mulheres, bem como colocar uma curva de regressão
+- Mais algumas poucas alterações....
+```{r}
+plot <- ggplot(data=subset(dCidade,nro_estab_sus<60)) +
+  geom_point(aes(x = nro_estab_sus, y = log(pop_homens),color='homem'),shape=3)+
+  geom_point(aes(x = nro_estab_sus, y = log(pop_mulheres),color='mulher'),shape=1)+
+  geom_smooth(aes(x = nro_estab_sus, y = log(pop_homens))
+              ,method = 'lm',col='darkblue')+
+  geom_smooth( aes(x = nro_estab_sus, y = log(pop_mulheres))
+               ,method='loess',col='magenta'
+  )+
+  labs(title='Estabelecimentos SUS x População',x='Nro estabelecimentos SUS',y='log(População)')+
+  scale_colour_manual(name = 'Gênero', 
+                      values =c('homem'='blue','mulher'='tomato1'), labels = c('Homem','Mulher'))
+```
+
+---
+  - Obtemos o gráfico abaixo
+```{r, warning=F, echo=F,fig.align='center',cache=F}
+plot
+```
+
+## Gráfico de linhas
+- O gráfico de linhas é bem simples
+```{r, warning=F, fig.height=3,fig.align='center'}
+ggplot(data=dCidade) +
+  geom_line(aes(x = nro_estab_sus, y = pop_homens+pop_mulheres,color='Homem'))+
+  geom_smooth(aes(x = nro_estab_sus, y = pop_homens+pop_mulheres)
+              ,method = 'loess',col='darkblue')
+```
+
+## Gráfico de pizza
+- Um gráfico de pizza com ggplot nada mais é que um gráfico de barras, com rotação polar em y
+
+```{r,cache=F}
+df <- data.frame(
+  variable = c("não se parece", "parece"),
+  value = c(20, 80)
+)
+pac <- ggplot(df, aes(x = "", y = value, fill = variable)) +
+  geom_bar(width = 1, stat = "identity") +
+  scale_fill_manual(values = c("red", "yellow")) +
+  coord_polar("y", start = pi / 2) +
+  labs(title = "Pac man")
+```
+
+## Gráfico de pizza
+
+```{r,fig.align='center',cache=F}
+pac
+```
+
+## Correlograma
+- Podemos gerar facilmente um correlograma das variáveias com:
+```{r}
+library(corrgram)
+corrgram(dCidade, lower.panel=panel.ellipse)
+```
+
+## Plotando mapas com o leafLet
+- O pacote leafLet foir criado pelos mesmos programadores do RStudio
+- Bastante flexível 
+- Poderoso
+- SIMPLES de usar
+- Vamos plotar a localização de todos os shoppings do Brasil
++ Pelo menos, aqueles que pegamos as coordenadas
+- A documentação pode ser encontrada nos sites:
+  + [http://leafletjs.com/](http://leafletjs.com/)
++ [https://rstudio.github.io/leaflet/](https://rstudio.github.io/leaflet/)
+
+
+## Plotando mapas com o leaflet    
+
+```{r}
+library(leaflet)
+sSql <- "select * from s3672792.shoppings where lat != ''"
+res <- dbSendQuery(conCurso, sSql)
+dShoppings <- fetch(res,n=-1)    
+m <- leaflet(dShoppings) %>% addTiles()
+m <- m %>% setView(lng = -48.021152, lat = -15.797552, zoom = 4) %>%  addProviderTiles("Esri.WorldStreetMap")
+
+```
+
+## Plotando mapas com o leaflet 
+
+```{r}
+m
+```
+
+
+## Plotando mapas com o leaflet{.small}
+- no site [https://leaflet-extras.github.io/leaflet-providers/preview/](https://leaflet-extras.github.io/leaflet-providers/preview/) encontramos exemplos de Tiles Providers
+
+```{r,fig.align='center',fig.height=3}
+leaflet(dShoppings) %>% addTiles() %>% 
+  setView(lng = -48.021152, lat = -15.797552, zoom = 4) %>% addProviderTiles("Esri.NatGeoWorldMap")
+```
+
+## Adicionando marcadores
+```{r}
+dShoppings$lat <- as.numeric(dShoppings$lat)
+dShoppings$lng <- as.numeric(dShoppings$lng)
+m <- leaflet(dShoppings) %>% addTiles() %>% 
+  setView(lng = -48.021152, lat = -15.797552, zoom = 4) %>%  
+  addProviderTiles("Esri.WorldStreetMap") %>%  
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat)  
+```
+
+## Adicionando marcadores
+```{r}
+m
+```
+
+## Alterando os marcadores
+- Colocando o popup da administradora do shopping
+```{r}
+library(htmltools)
+m <- m %>% clearControls() %>% 
+  clearMarkerClusters() %>%
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat,popup = ~htmlEscape(dShoppings$administradora))  
+m
+```
+
+
+## Alterando os marcadores
+- Agrupando
+```{r}
+m %>% clearMarkers() %>%
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat
+             ,popup = ~htmlEscape(dShoppings$administradora)
+             ,clusterOptions = markerClusterOptions())  
+```
+
+
+
+
+
+```{r, include=F}
+dbDisconnect(con2)
+```

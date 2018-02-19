@@ -1,0 +1,108 @@
+/*mapa*/
+.panel-default {
+    border-color: #990000;
+}
+body {
+  width:100%;
+  height:100%
+}
+#input_date_control {
+  background-color: rgba(47, 37, 36, 1);
+  color:#FFF;
+  opacity: 0.95;
+  border-radius: 0px;
+  padding: 1em;
+  padding-bottom: 0.15em;
+}
+.panel {
+  margin-bottom: 20px;
+  background-color: #009900;
+    border: 1px solid transparent;
+  border-radius: 4px;
+  -webkit-box-shadow: 0 1px 1px rgba(0,0,0,.05);
+  box-shadow: 0 1px 1px rgba(0,0,0,.05);
+}
+label{
+  color:#fdc918;
+}
+span{
+  color:#fff;
+}
+.leaflet-popup-content {
+    margin: 13px 19px;
+    line-height: 1.4;
+    color:#FFF;
+}
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+    background: rgba(47, 37, 36, 1);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+    opacity: 0.95;
+    border-radius: 0px;
+}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 2;
+	padding: 4px 4px 0 0;
+	text-align: center;
+	width: 18px;
+	height: 14px;
+	font: 16px/14px Tahoma, Verdana, sans-serif;
+	color: #fff;
+	text-decoration: none;
+	font-weight: bold;
+	background: transparent;
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+	color: #fdc918;
+}
+.selectize-input.full {
+  background-color: #fff;
+  border-radius: 0px;
+  border:1px solid #fff;
+}
+.selectize-input.full:hover {
+  border:1px solid #fdc918;
+  border-radius: 0px;
+}
+.selectize-input,
+.selectize-control.single .selectize-input.input-active {
+  background: #f9fdfe;
+  cursor: text;
+  border-radius:0px;
+  display: inline-block;
+  border:1px solid #fdc918;
+}
+.selectize-dropdown,
+.selectize-dropdown.form-control {
+  height: auto;
+  padding: 0;
+  margin: 2px 0 0 0;
+  z-index: 1000;
+  border-radius:0px;
+  background: #C6DB85;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+}
+.form-control {
+    color: #555;
+    background-color: #fff;
+    border: 1px solid #FFF;
+    border-radius: 0px;
+}
+.form-control:hover,.form-control:focus {
+    border:1px solid #fdc918;
+    border-radius: 0px;
+}
+.selectize-dropdown .active {
+  background-color: #fff;
+  color: #2e2524;
+}
+.selectize-dropdown [data-selectable] .highlight {
+  background: #C6DB85;
+  -webkit-border-radius: 2px;
+  -moz-border-radius: 2px;
+  border-radius: 2px;
+  color:#2e2524;
+}
