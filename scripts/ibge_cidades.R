@@ -13,10 +13,15 @@ names(dTemas) <- c('ano','tema')
 #http://cidades.ibge.gov.br/xtras/csv.php?lang=&idtema=16&codmun=150080
 
 dSinteseInformacaoTotal <- data.frame()
+dSinteseInformacaoTotal <- readRDS('scripts/sintese.Rds')
+tail(unique(dSinteseInformacaoTotal$codmun))
+length(unique(dSinteseInformacaoTotal$codmun))
+#dCidades[4001,'nome']
 
 iCidade <- 10
 iTema <- 1
-for (iCidade in 1:nrow(dCidades)) {
+
+for (iCidade in 4536:nrow(dCidades)) {
   print(paste('Buscando cidade:',dCidades[iCidade,'nome']))
   for (iTema in 1:nrow(dTemas)) {
     print(paste(' --> tema:',dTemas[iTema,'tema']))
@@ -29,6 +34,7 @@ for (iCidade in 1:nrow(dCidades)) {
     dSinteseInformacao$codmun <- dCidades[iCidade,'codmun']
     names(dSinteseInformacao) <- c('descricao','valor','unidade','ano','codmun')
     dSinteseInformacaoTotal <- rbind(dSinteseInformacaoTotal,dSinteseInformacao)
+    saveRDS(dSinteseInformacaoTotal,file = 'scripts/sintese.Rds')
   }
 }
 
