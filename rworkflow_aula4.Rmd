@@ -1,321 +1,455 @@
 ---
-title: "Aula 4 - RMarkdown"
+title: "Aula 4"
 author: "André Pignata"
-date: "6 de Janeiro de 2017"
-output:
+date: "17 de Julho de 2017"
+output: 
   ioslides_presentation:
-    css: rworkflow.css
-    logo: images/logo.png
-    widescreen: yes
-  beamer_presentation: default
+  widescreen: true
+logo: images/logo.png
+css: rworkflow.css
+#runtime: shiny
 toc: yes
 ---
-
+  
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = T)
 knitr::opts_chunk$set(cache = F)
 knitr::opts_chunk$set(fig.align = 'center')
+library(jsonlite)
 library(RPostgreSQL)
-```
-# Geração de relatórios com RMarkdown - Aula 4
-
-## O que é? E por que usar?
-  - O markdown é uma linguagem de marcação para geração de documentos
-  - Os desenvolvedores do RStudio, criaram uma versão integrada, chamada RMarkdown
-  - 99% do que funciona com Markdown, funciona com o RMarkdown, mas tem aquele 1%....
-  - Com o RMarkdown podemos gerar:
-    + Apresentações
-    + Word
-    + PDF (para artigos, recomendo o uso do Knitr, com LaTeX)
-    + HTML
-  - Facilidade com versionamento de código (espero abordar em cursos futuros)
-
-
-## Criando um arquivo de exemplo
-  - No RStudio, selecionem:
-    + File -> New File -> R Markdown
-    + Coloquem um título
-    + Vamos deixar marcado a opção HTML
-    + Cliquem em OK
-  - Compilando o arquivo com ctrl+shift+k (ou botão Knit)
-  - Gerando PDF e Word
-  
-## Cuidados ao colocar código 
-  - Por ser uma linguagem bastante genérica, nem todas as funcionalidades de um tipo de documento, pode funcionar em outro
-  - Por exemplo, se introduzirmos código $LaTeX$ dentro do documento, ele será compilado em PDF normalmente, mas apresentará problemas de exibição em HTML ou Word
-  - Portanto, devemos definir PARA QUE queremos gerar o nosso documento:
-    + Artigo -> PDF
-    + Apresentação -> HTML/PDF
-    + Página WEB -> HTML
-    + Perder tempo -> DOC
-
-## Entendendo a estrutura do documento
-  - Cabeçalho metada YAML
-  - Markdown
-  - Pedaços (chunks) de código R
-  
-## Markdown
-  - Vamos ver as opções do Markdown, utilizando a própria referência que vem com o RStudio
-  - HELP -> Cheatsheets -> R Markdown Reference Guide
-  - Formatação de texto:
-    + Itálico: \**italico*\*
-    + Negrito: \*\***negrito**\*\*
-    + Sobrescrito: 2\^2\^ => 2^2^
-    + Tachado: \~\~~~tachado~~\~\~
-    
-## Capítulos e seções
-
-  - \# Capítulo (equivalente ao h1 em html)
-  - \#\# Seção (equivalente ao h2 em html)
-  - \#\#\# Sub-seção (equivalente ao h3 em html)
-  - O Markdown aceita até 6 níveis de formatação
-    
-## Quebra de linha
-  - O Markdown não quebra a linha como está no editor, a quebra é feita de forma automática
-    + WYSIWYG x WYMIWYG
-  - Ou, devemos deixar 2 ou mais espaços entre as linhas para mostrar que queremos quebrar a linha.
-
-
-## Listas
-  - Podemos criar listas com os comandos:
-  - \*
-  - \+
-  - \-
-  - 1. (lista numerada)
-  - Ex:  
-    \- Item 1  
-      \+ Item 1a  
-    \* Item 2
-  - Cuidado, items e subitens são diferenciados pela identação (coloquem o Item 1a, como subitem do Item 1)
-  
-
-## Outros elementos de formatação
-  - Imagem: \!\[\](caminho.png)
-  - Para definirmos o tamanho das imagens, há vários métodos   
-    + Em HTML, podemos trabalhar com css ou
-    + Colocar a tag \<img style="width:100px,height:100px"\ src="imagem.jpg"\>
-    + Em $LaTeX$ podemos inserir a imagem com o comando \\includegraphics e especificar o tamanho
-  - Equação inline:
-    - \$y = \\beta\_\{0\} + \\beta\_\{1\}x\_\{0\}+\\beta\_\{2\}x\_\{1\}\$
-    - $y = \beta_{0} + \beta_{1}x_{0}+\beta_{2}x_{1}$
-    - Para outros símbolos matemáticos:  
-      +[https://www.mathjax.org/](Mathjax) se o documento for html  
-      +[http://tug.ctan.org/info/symbols/comprehensive/symbols-a4.pdf](Comprehensive Symbols) se for pdf
-    
-## Blocos de texto
-  - Podemos criar blocos de citação com \>
-  
-  > O tambor faz muito barulho  
-  > mas é vazio por dentro  
-  > (Barão de Itararé)
-  
-  - Também podemos colocar código no meio de nosso texto com ```
-  
-  > \`\`\`  
-  > x = rnorm(10)  
-  > \`\`\`  
-
-```
-x = rnorm(10)  
-```
-  - Daqui a pouco veremos como executar esse código
-  
-  
-## Tabelas
-  - Podemos fazer a criação manual de nossas tabelas com:  
-  Cabeçalho 1 \| Cabeçalho 2  
-  \-----------\|\------------
-  1           \| 2  
-  3           \| 4
-  
-  Cabeçalho 1 | Cabeçalho 2  
-  ------------|-------------
-  1           | 2  
-  3           | 4  
-  
-  - A formatação da tabela deve ser feita através de CSS
-  - Existem outros pacotes que torna muito mais fácil a criação de tabelas
-  
-## Pander
-  - Um dos pacotes mais práticos que encontrei é o pander
-  - Vamos recuperar os dados da tabela cidade_sintese
-  
-```{r}
-  conCurso <- dbConnect(PostgreSQL(), user= "r_workflow", password="curso",
-                        dbname="r_workflow",host="143.107.205.218",port='5432')
-  sSql <- "select * from s3672792.cidade_sintese"
-  res <- dbSendQuery(conCurso, sSql)
-  dCidade <- fetch(res,n=-1)   
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(stargazer)
+con2 <<- dbConnect(PostgreSQL(), user= "usr_usp", password='leitura',  dbname="bases",host="nv1.fearp.usp.br",port='1754')
 ```
 
-## Pander
-  - Vamos plotar uma tabela com o codigo do município e seu nome
-```{r,warning=F}
-  library('pander')
-  dTemp <- head(dCidade[,c('codmun','nome')])
-  pander(dTemp)
-```
+# Análise de dados - Aula 4
 
-## Pander
-  - Podemos mudar o alinhamento com o comando justify
-```{r,warning=F}
-  pander(dTemp,justify=c('center','left') )
-```
-
-## Pander
-  - Para renomear as colunas, basta renomear o dataframe
-  - Também podemos colocar um título em nossa tabela
-```{r,warning=F}
-  names(dTemp) <- c('Cód. IBGE','Nome')
-  pander(dTemp,justify=c('center','left'),caption='Municípios' )
-```
-
-## Pander
-  - Outras funcionalidades do Pander:
-    + [http://rapporter.github.io/pander/](http://rapporter.github.io/pander/)
-  - Para quem for trabalhar com $LaTeX$ recomendo utilizar a função xtable, com only.contents=TRUE
-    + \\begin{tabular}
-    + print(xtable(dTemp),only.contents=TRUE)
-    + \\end{tabular}
-  - Da mesma forma, quem for trabalhar com tabelas dinâmicas (sem saber a formatação prévia), recomendo utilizar o pacote longtabu do $LaTeX$
-  
-## Inserindo comandos de R
-  - Para inserirmos comandos de R, basta criarmos um chunk de código, especificando a linguagem (no caso, R)
-  
- > \`\`\`{r}  
-  > x = rnorm(10)  
-  > x  
-  > \`\`\`    
-  
-  
-```{r,echo=F}
-  x = rnorm(10)
-  x
-```
-
-## Principais parâmetros do chunk de código
-  - Podemos passar alguns parâmetros úteis nos chunks:
-    + eval: se FALSE, o knitr não avaliará o chunk
-    + include: se FALSE, executa o chunk, mas não coloca no documento final
-    + echo: se FALSE, não exibe o código, apenas o resultado final
-    + results: se 'asis', exibe o código sem formatação de markup (por exemplo, quando queremos retornar um código de tabela em $LaTeX$)
-    + error,message,warning: se FALSE, não exibe erros, mensagens ou avisos ao executar o código
-    + cache: se TRUE,  o chunk não será recompilado, até ser alterado
-    
-## Principais parâmetros do chunk de código
-  - Opções para figuras:
-    + fig.align: 'left','right','center','default'
-    + fig.cap: Título da imagem, em $LaTeX$
-    + fig.lp: prefixo do label da imagem em $LaTeX$
-    + fig.width: largura da imagem
-    + fig.height: altura da imagem
-    
-## Plotando gráficos com R
-  - Para plotarmos os gráficos em nossos documentos, basta chamar a função plot ou ggplot dentro do chunk de código
+## Obtendo os dados
+- Vamos trabalhar com a nossa tabela cidade_sintese
+- Primeiramente, importamos ela para o R
 
 ```{r}
-  plot(rnorm(100))
-```
+conCurso <<- dbConnect(PostgreSQL(), user= "r_workflow", password="curso",  dbname="r_workflow",host="143.107.205.218",port='5432')
+sSql <- "select * from s3672792.cidade_sintese"
+dCidade <- dbGetQuery(conCurso, sSql)
+```  
 
-
-## Outras linguagens aceitas pelo RMarkdown
-  * Podemos criar chunks com:
-    + Python
-    + **SQL**
-    + Bash
-    + Rcpp
-    + Stan
-    + Javascript
-    + Css
-
-## Exemplo com SQL{.small}
-
-> \`\`\`{sql, connection=conCurso}  
->   select * from s3672792.cidade_sintese  
-> \`\`\`
-
-```{sql, connection=conCurso,echo=F}
-  select * from s3672792.cidade_sintese
-```
-
-## Exemplo com SQL
-  * Por padrão o comando exibe os 10 primeiros resultados em tela
-    + Podemos alterar isso com o max.print: \`\`\`{sql, connection=conCurso, max.print = 20}
-    + max.print = -1 é ilimitado
-  * Para alterar o caption:
-    + tab.cap = 'Título da tabela
-    + tab.cap = NA - para ficar sem título
-  * Para armazenar o resultado em um dataframe
-    + output.var="dCidade"
-    + Ao usar output.var, o resultado não é impresso no documento
-  * Para usar variáveis do R, utilize a sintaxe **?**
-    + select * from s3672792.sintese_cidades where codmun = ?iCodMun
-
-## Últimas considerações
-  * Para atribuir uma conexão padrão:
-    + knitr::opts_chunk$set(connection = "conCurso")
-
-  * Apesar de ser possível, previsa utilizar o comando css no header YAML
-
-# Geração de páginas com Shiny
-
-## O que é o Shiny?
-  - O Shiny ([https://shiny.rstudio.com/](https://shiny.rstudio.com/)) é um framework de desenvolvimento WEB com R
-  - A documentação na página é MUITO BOA, recomendo
-  - Você pode utilizar a galeria para se inspirar
-  - Você pode criar páginas, sem saber (quase) nada de HTML
-  
-## Criando uma página com Shiny
-  - Existem 2 modos principais de se criar uma aplicação com Shiny
-    + 2 arquivos: ui.R e server.R 
-    + 1 arquivo: app.R (mais fácil de manter, na minha opinião)
-  - Vamos criar nosso primeiro aplicativo com Shiny:
-    + File -> New File -> Shiny Web App
-    + Dêem um nome para sua aplicação
-    + Escolham Single file app
-    + Escolham um lugar para salvar
-  - No arquivo app.R que foi criado, cliquem em Run App
-  
-## Estrutura e organização do arquivo
-  - Parte UI (User Interface)
-    + Fluidpage
-    + titlePanel
-    + sidebarLayout
-    + sidebarPanel
-    + sliderInput
-    + mainPanel
-    + plotOutput
-    
-## Estrutura e organização do arquivo
-  - Parte Server 
-    + input e output
-    + renderPlot
-    
-## Executando a aplicação
-  - shinyApp
-    + shiny::runApp(display.mode="showcase")
-  - Start simple: vamos dar uma olhada nas funcionalidades de algumas aplicações na galeria do Shiny
-    + Kmeans example
-    + Word cloud
-    + DataTables Demo
-    + Widget Gallery
-    
-## Criando uma página de exemplo
-   - Vamos recuperar os dados da tabela cidade_sintese
+## Produzindo estatísticas descritivas
+- Podemos verificar os dados de um dataframe com a função summary
 ```{r}
-  conCurso <<- dbConnect(PostgreSQL(), user= "r_workflow", password="curso", dbname="r_workflow",host="143.107.205.218",port='5432')
-  sSql <- "select * from s3672792.cidade_sintese"
-  res <- dbSendQuery(conCurso, sSql)
-  dCidade <- fetch(res,n=-1)   
+summary(dCidade[,1:4])
 ```
-  - O objeto é, ao digitar o nome de uma cidade, fazer a busca e retornar os dados da mesma
-    - Scripts/shiny/Cidades
-    
-## Plotando um mapa interativo com Shiny
-    - Scripts/shiny/Mapa
 
-    
+## Produzindo estatísticas descritivas
+- Podemos utilizar o pacote stargazer para fazer um output mais 'bonito'
+- Não há milagres!
+- Fica melhor no PDF
+```{r, results='asis'}
+library(stargazer)
+dCidade$codmun <- as.character(dCidade$codmun)
+stargazer(dCidade,rownames = FALSE,type ='html',align = TRUE)
+```
+
+
+## Produzindo estatísticas descritivas
+- Podemos obter maiores detalhes com o pacote psych 
+```{r, warning=F}
+library(psych)
+describe(dCidade)
+```
+
+## Produzindo estatísticas descritivas
+- Podemos refinar nossa pesquisa agrupando variáveis de interesse
+- Pacote dplyr ![Cheat Sheet](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf) 
+```{r, warning=F}
+library(dplyr)
+dTemp <- dCidade %>% filter(dCidade$estado %in% c('SP','RJ'))
+describeBy(dTemp[,c('estado','pop_alfabetizada')],group=dTemp$estado)
+```
+
+## Funções estatísticas
+- Também podemos utilizar as funções:
+  * mean
+  * sd
+  * median
+  * min
+  * max
+  * range
+  * skew: viés
+
+## Spread
+- Com a biblioteca tidyr podemos transformar facilmente com tabelas em formato longo (série temporal) em formato largo (painel). EX:
+```{r,warning=F}
+sSql <- "select * from s3672792.sintese_informacao"
+dSintese <- dbGetQuery(conCurso, sSql) 
+#spread(dataframe,condição, valor)
+dLargo <- spread(dSintese[c('codmun','ano','descricao','valor')]
+                 ,descricao,valor)
+head(dLargo)
+```
+
+## Regressão{.small}
+- A regressão é uma ferramenta bastante utilizada para predição do comportamento das variáveis
+- A mais comumente utilizada é a regressão linear
+- Vejamos o comportamento do Nro de estabelecimentos do SUS em relação à população alfabetizada
+```{r}
+r1 <- lm(dCidade$nro_estab_sus ~ dCidade$pop_alfabetizada)
+r1
+```
+
+## Regressão{.small}
+
+```{r,results='asis'}
+stargazer(r1,type='html',align = TRUE)
+```
+
+## Regressão{.small}
+
+```{r}
+plot(nro_estab_sus ~ pop_alfabetizada,data=dCidade) 
+abline(r1)
+```
+
+## Regressão{.small}
+
+```{r}
+dTemp <- dCidade %>% filter(dCidade$pop_alfabetizada<500000)
+plot(nro_estab_sus ~ pop_alfabetizada,data=dTemp) 
+abline(lm(dTemp$nro_estab_sus ~dTemp$pop_alfabetizada))
+```
+
+## Regressão{.small}
+- Podemos também fazer uma regressão com mais de uma variável explicativa
+
+```{r, results='asis',size='small'}
+r2 <- lm(dTemp$nro_estab_sus ~dTemp$pop_alfabetizada+dTemp$pop_homens+dTemp$pop_mulheres)
+summary(r2)
+stargazer(r1,type='html',align = TRUE)
+```
+
+## Regressão{.small}
+```{r}
+par(mfrow = c(2, 2))
+plot(r2)
+```
+
+## Regressão Logit
+- Para a regressão Logit, precisamos ter uma variável categórica ou binária
+- Para nosso exemplo, vamos criar uma variável que será 1 se a cidade tiver mais de 80% da 
+população alfabetizada, 0 caso contrário
+```{r}
+dCidade$mais_de_80perc <- 0
+dCidade$mais_de_80perc[dCidade$pop_alfabetizada/(dCidade$pop_homens+dCidade$pop_mulheres) > 0.8] <- 1
+```
+
+## Regressão Logit
+- Agora, vamos analisar o comportamento desta variável em relação ao número de estabelecimentos do SUS
+
+```{r,results='asis'}
+g1 <- glm(mais_de_80perc ~ nro_estab_sus, data=dCidade, family = "binomial")
+stargazer(g1,type='html',align = TRUE)
+```
+
+## Regressão Logit
+- Plotando o resultado
+```{r}
+par(mfrow = c(2, 2))
+plot(g1)
+```
+
+## Análise das regressões
+- Intervalo de confiança
+```{r}
+confint(g1)
+confint(r2)
+```
+
+## Análise das regressões
+- Coeficientes
+```{r}
+coefficients(r2)
+head(residuals(r2))
+```
+
+## Análise das regressões
+- teste t
+```{r}
+t.test(dCidade$nro_estab_sus,dCidade$pop_alfabetizada)
+```
+
+## Análise das regressões
+- Prevendo o valor do número de estabelecimentos do SUS, de acordo com a população alfabetizada
+```{r}
+r1 <- lm(nro_estab_sus ~ pop_alfabetizada, data=dCidade)
+dPopAlfabetizada <- data.frame(pop_alfabetizada=100000)
+#dCidade$estimativa <-  
+predict(r1,dPopAlfabetizada, interval="predict")
+```
+
+## Análise das regressões
+- teste ANOVA
+
+```{r}
+anova(r2, test="Chisq")
+```
+
+## Análise com particionamentos{.small}
+- Podemos agrupar nossos dados com a utilização do método k-means
+```{r,warning=F,fig.height=2.5}
+dTemp <- na.omit(dCidade)
+dTemp <- dTemp[dTemp$nro_estab_sus < 60,]
+fit <- kmeans(dTemp[,c('nro_estab_sus','pop_alfabetizada')], 5)
+fit$cluster <- as.factor(fit$cluster)
+ggplot(dTemp,aes(x=nro_estab_sus,y=pop_alfabetizada,color=fit$cluster))+geom_point()
+
+```
+
+# Gráficos
+
+## O pacote ggplot2
+- O pacote ggplot (e agora sua versão mais nova ggplot2) vem se consolidando como um dos pacotes mais usados para geração de gráficos
+- Bastante flexível
+- Poderoso
+- Muito personalizável
+- Bonito!
+  - Coisas que não deveriam ser feitas com ggplot:
+  + Gráficos 3D (pacote rgl)
++ Grafos (pacote igraph)
++ Gáficos interativos (pacote ggvis e shiny)
+
+## A gramática dos gráficos
+- Para criarmos gráficos criamos __blocos__ de sintaxe e juntamos
++ Vamos brincar de lego?
+- Quais são os blocos com os quais podemos trabalhar:
+  + Dados
++ Mapeamento estético 
++ Objetos geométricos 
++ Transformações estatíticas
++ Escalas
++ Sistema de coordenadas
++ Ajustes de posição
+- O curso será focado 'apenas' em Dados e Mapeamento estético
+
+
+## Histograma{.small}
+- Podemos plotar facilmente um histograma em R com a função hist()
+
+```{r, fig.width=6, fig.align='center',fig.height=3.5}
+
+hist(dCidade[dCidade$nro_estab_sus < 60,c('nro_estab_sus')],
+     main = 'Distribuição de cidades com menos de 60 estabelecimentos do SUS'
+     ,xlab = 'Nro de estabelecimentos', ylab='Frequência'
+)
+```
+
+## Histograma{.small}
+- Com ggplot2
+```{r, fig.align='center',warning=F,fig.height=3.5}
+library(ggplot2)
+ggplot(data=dCidade %>% filter(dCidade$nro_estab_sus<60), aes(x = nro_estab_sus,fill=estado)) +
+  geom_histogram(binwidth=3)
+```
+
+##Gráfico de barras
+- Como seria um gráfico de barras mostrando a distribuição entre homens e mulheres em cada estado?
+- Para isso, vamos montar uma nova consulta
+
+```{r}
+sSql <- "select substr(c.nome,strpos(nome,'/')+1) as estado, s.descricao, 
+sum(case when valor = '-' then 0 else replace(valor,'.','')::numeric end) as valor
+from s3672792.cidades c
+inner join s3672792.sintese_informacao  s on (c.codmun = s.codmun)
+where
+s.descricao = 'População residente - Mulheres' 
+or
+s.descricao = 'População residente - Homens'
+group by estado,descricao"
+dBarra <- dbGetQuery(conCurso, sSql)
+```
+
+---
   
-```{r, echo=F, include=F}
-  dbDisconnect(conCurso)
+```{r,fig.align='center',fig.width=10}
+options(scipen=9)  
+ggplot(data=dBarra) +
+  geom_bar(aes(x = estado,y=valor, fill=descricao),stat = "identity")
+```
+
+---
+  
+```{r,fig.align='center',fig.width=10}
+ggplot(data=dBarra) +
+  geom_bar(aes(x = estado,y=valor, fill=descricao),stat = "identity"
+           ,position = 'dodge')
+```
+
+
+
+## Scatterplot
+```{r}
+
+ggplot(data=subset(dCidade,nro_estab_sus<60), aes(x = nro_estab_sus, y = pop_homens)) +
+  geom_point()
+```
+
+## Scatterplot
+- Vamos adicionar a série de população de mulheres, bem como colocar uma curva de regressão
+- Mais algumas poucas alterações....
+```{r}
+plot <- ggplot(data=subset(dCidade,nro_estab_sus<60)) +
+  geom_point(aes(x = nro_estab_sus, y = log(pop_homens),color='homem'),shape=3)+
+  geom_point(aes(x = nro_estab_sus, y = log(pop_mulheres),color='mulher'),shape=1)+
+  geom_smooth(aes(x = nro_estab_sus, y = log(pop_homens))
+              ,method = 'lm',col='darkblue')+
+  geom_smooth( aes(x = nro_estab_sus, y = log(pop_mulheres))
+               ,method='loess',col='magenta'
+  )+
+  labs(title='Estabelecimentos SUS x População',x='Nro estabelecimentos SUS',y='log(População)')+
+  scale_colour_manual(name = 'Gênero', 
+                      values =c('homem'='blue','mulher'='tomato1'), labels = c('Homem','Mulher'))
+```
+
+---
+  - Obtemos o gráfico abaixo
+```{r, warning=F, echo=F,fig.align='center',cache=F}
+plot
+```
+
+## Gráfico de linhas
+- O gráfico de linhas é bem simples
+```{r, warning=F, fig.height=3,fig.align='center'}
+ggplot(data=dCidade) +
+  geom_line(aes(x = nro_estab_sus, y = pop_homens+pop_mulheres,color='Homem'))+
+  geom_smooth(aes(x = nro_estab_sus, y = pop_homens+pop_mulheres)
+              ,method = 'loess',col='darkblue')
+```
+
+## Gráfico de pizza
+- Um gráfico de pizza com ggplot nada mais é que um gráfico de barras, com rotação polar em y
+
+```{r,cache=F}
+df <- data.frame(
+  variable = c("não se parece", "parece"),
+  value = c(20, 80)
+)
+pac <- ggplot(df, aes(x = "", y = value, fill = variable)) +
+  geom_bar(width = 1, stat = "identity") +
+  scale_fill_manual(values = c("red", "yellow")) +
+  coord_polar("y", start = pi / 2) +
+  labs(title = "Pac man")
+```
+
+## Gráfico de pizza
+
+```{r,fig.align='center',cache=F}
+pac
+```
+
+## Correlograma
+- Podemos gerar facilmente um correlograma das variáveias com:
+```{r}
+library(corrgram)
+corrgram(dCidade, lower.panel=panel.pts)
+```
+
+##Quase..
+
+<img src='images/tenor.gif' style="align:center">
+
+
+## Plotando mapas com o leafLet
+- O pacote leafLet foir criado pelos mesmos programadores do RStudio
+- Bastante flexível 
+- Poderoso
+- SIMPLES de usar
+- Vamos plotar a localização de todos os shoppings do Brasil
++ Pelo menos, aqueles que pegamos as coordenadas
+- A documentação pode ser encontrada nos sites:
+  + [http://leafletjs.com/](http://leafletjs.com/)
++ [https://rstudio.github.io/leaflet/](https://rstudio.github.io/leaflet/)
+
+
+## Plotando mapas com o leaflet    
+
+```{r}
+library(leaflet)
+sSql <- "select * from s3672792.shoppings where lat != ''"
+dShoppings <- dbGetQuery(conCurso, sSql)
+m <- leaflet(dShoppings) %>% addTiles()
+m <- m %>% setView(lng = -48.021152, lat = -15.797552, zoom = 4)  %>% 
+        addProviderTiles("Esri.WorldStreetMap")
+```
+
+## Plotando mapas com o leaflet 
+
+```{r}
+m
+```
+
+
+## Plotando mapas com o leaflet{.small}
+- no site [https://leaflet-extras.github.io/leaflet-providers/preview/](https://leaflet-extras.github.io/leaflet-providers/preview/) encontramos exemplos de Tiles Providers
+
+```{r,fig.align='center',fig.height=3}
+leaflet(dShoppings) %>% addTiles() %>% 
+  setView(lng = -48.021152, lat = -15.797552, zoom = 4) %>% 
+  addProviderTiles("Esri.NatGeoWorldMap")
+```
+
+## Adicionando marcadores
+```{r}
+dShoppings$lat <- as.numeric(dShoppings$lat)
+dShoppings$lng <- as.numeric(dShoppings$lng)
+m <- leaflet(dShoppings) %>% addTiles() %>% 
+  setView(lng = -48.021152, lat = -15.797552, zoom = 4) %>%  
+  addProviderTiles("Esri.WorldStreetMap") %>%  
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat)  
+```
+
+## Adicionando marcadores
+```{r}
+m
+```
+
+## Alterando os marcadores
+- Colocando o popup da administradora do shopping
+```{r}
+library(htmltools)
+m <- m %>% clearControls() %>% 
+  clearMarkerClusters() %>%
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat
+             ,popup = ~htmlEscape(dShoppings$administradora))  
+```
+
+## Alterando os marcadores
+```{r}
+m
+```
+
+
+
+## Alterando os marcadores
+- Agrupando
+```{r}
+m <- m %>% clearMarkers() %>%
+  addMarkers(lng = dShoppings$lng,lat=dShoppings$lat
+             ,popup = ~htmlEscape(dShoppings$administradora)
+             ,clusterOptions = markerClusterOptions())  
+```
+
+## Alterando os marcadores
+```{r}
+m
+```
+
+##Agora sim...
+
+<img src='images/end.gif' style="width:100%">
+
+
+
+```{r, include=F}
+dbDisconnect(con2)
 ```

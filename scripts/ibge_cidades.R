@@ -21,7 +21,7 @@ length(unique(dSinteseInformacaoTotal$codmun))
 iCidade <- 10
 iTema <- 1
 
-for (iCidade in 4536:nrow(dCidades)) {
+for (iCidade in 1:10) {
   print(paste('Buscando cidade:',dCidades[iCidade,'nome']))
   for (iTema in 1:nrow(dTemas)) {
     print(paste(' --> tema:',dTemas[iTema,'tema']))
@@ -38,7 +38,12 @@ for (iCidade in 4536:nrow(dCidades)) {
   }
 }
 
-con2 <<- dbConnect(PostgreSQL(), user= "r_workflow", password="curso",  dbname="r_workflow",host="143.107.205.218",port='5432')
+con2 <<- dbConnect(PostgreSQL(), 
+                   host="143.107.205.218"
+                   ,port='5432'
+                   ,user= "r_workflow", 
+                   password="curso",  
+                   dbname="r_workflow",host="143.107.205.218",port='5432')
 dbSendQuery(con2,paste0('CREATE SCHEMA if not exists "',sNroUSP,'" AUTHORIZATION r_workflow;'))
 
 dbWriteTable(con2, c(sNroUSP,'sintese_informacao'),dSinteseInformacaoTotal,append=T)

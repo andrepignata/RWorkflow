@@ -1,0 +1,321 @@
+---
+title: "Aula 5 - RMarkdown"
+author: "André Pignata"
+date: "17 de Julho de 2017"
+output:
+  ioslides_presentation:
+    css: rworkflow.css
+    logo: images/logo.png
+    widescreen: yes
+  beamer_presentation: default
+toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(cache = F)
+knitr::opts_chunk$set(fig.align = 'center')
+library(RPostgreSQL)
+```
+# Geração de relatórios com RMarkdown - Aula 5
+
+## O que é? E por que usar?
+  - O markdown é uma linguagem de marcação para geração de documentos
+  - Os desenvolvedores do RStudio, criaram uma versão integrada, chamada RMarkdown
+  - 99% do que funciona com Markdown, funciona com o RMarkdown, mas tem aquele 1%....
+  - Com o RMarkdown podemos gerar:
+    + Apresentações
+    + Word
+    + PDF 
+    + HTML
+  - Facilidade com versionamento de código (GIT)
+
+
+## Criando um arquivo de exemplo
+  - No RStudio, selecionem:
+    + File -> New File -> R Markdown
+    + Coloquem um título
+    + Vamos deixar marcado a opção HTML
+    + Cliquem em OK
+  - Compilando o arquivo com ctrl+shift+k (ou botão Knit)
+  - Gerando PDF e Word
+  
+## Cuidados ao colocar código 
+  - Por ser uma linguagem bastante genérica, nem todas as funcionalidades de um tipo de documento, pode funcionar em outro
+  - Por exemplo, se introduzirmos código $LaTeX$ dentro do documento, ele será compilado em PDF normalmente, mas apresentará problemas de exibição em HTML ou Word
+  - Portanto, devemos definir PARA QUE queremos gerar o nosso documento:
+    + Artigo -> PDF
+    + Apresentação -> HTML/PDF
+    + Página WEB -> HTML
+    + Perder tempo -> DOC
+
+## Entendendo a estrutura do documento
+  - Cabeçalho metada YAML
+  - Markdown
+  - Pedaços (chunks) de código R
+  
+## Markdown
+  - Vamos ver as opções do Markdown, utilizando a própria referência que vem com o RStudio
+  - HELP -> Cheatsheets -> R Markdown Reference Guide
+  - **Cuidado**: markdown é uma linguagem de Markup, portanto, tudo o que abre, fecha
+  - Formatação de texto:
+    + Itálico: \**italico*\*
+    + Negrito: \*\***negrito**\*\*
+    + Sobrescrito: 2\^2\^ => 2^2^
+    + Tachado: \~\~~~tachado~~\~\~
+    
+## Capítulos e seções
+
+  - \# Capítulo (equivalente ao h1 em html, \\chapter em $LaTeX$)
+  - \#\# Seção (equivalente ao h2 em html, \\section  em $LaTeX$)
+  - \#\#\# Sub-seção (equivalente ao h3 em html, \\subsection  em $LaTeX$)
+  - O Markdown aceita até 6 níveis de formatação
+    
+## Quebra de linha
+  - O Markdown não quebra a linha como está no editor, a quebra é feita de forma automática
+    + WYSIWYG x WYMIWYG
+  - Ou, devemos deixar 2 ou mais espaços entre as linhas para mostrar que queremos quebrar a linha.
+
+
+## Listas
+  - Podemos criar listas com os comandos:
+  - \*
+  - \+
+  - \-
+  - 1. (lista numerada)
+  - Ex:  
+    \- Item 1  
+      \+ Item 1a  
+    \* Item 2
+  - Cuidado, items e subitens são diferenciados pela identação (coloquem o Item 1a, como subitem do Item 1)
+  
+
+## Outros elementos de formatação
+  - Imagem: \!\[\](caminho.png)
+  - Para definirmos o tamanho das imagens, há vários métodos   
+    + Em HTML, podemos trabalhar com css ou
+    + Colocar a tag \<img style="width:100px,height:100px"\ src="imagem.jpg"\>
+    + Em $LaTeX$ podemos inserir a imagem com o comando \\includegraphics e especificar o tamanho
+  - Equação inline:
+    - \$y = \\beta\_\{0\} + \\beta\_\{1\}x\_\{0\}+\\beta\_\{2\}x\_\{1\}\$
+    - $y = \beta_{0} + \beta_{1}x_{0}+\beta_{2}x_{1}$
+    - Para outros símbolos matemáticos:  
+      +[https://www.mathjax.org/](Mathjax) se o documento for html  
+      +[http://tug.ctan.org/info/symbols/comprehensive/symbols-a4.pdf](Comprehensive Symbols) se for pdf
+    
+## Blocos de texto
+  - Podemos criar blocos de citação com \>
+  
+  > O tambor faz muito barulho  
+  > mas é vazio por dentro  
+  > (Barão de Itararé)
+  
+  - Também podemos colocar código no meio de nosso texto com ```
+  
+  > \`\`\`  
+  > x = rnorm(10)  
+  > \`\`\`  
+
+```
+x = rnorm(10)  
+```
+  - Daqui a pouco veremos como executar esse código
+  
+  
+## Tabelas
+  - Podemos fazer a criação manual de nossas tabelas com:  
+  Cabeçalho 1 \| Cabeçalho 2  
+  \-----------\|\------------
+  1           \| 2  
+  3           \| 4
+  
+  Cabeçalho 1 | Cabeçalho 2  
+  ------------|-------------
+  1           | 2  
+  3           | 4  
+  
+  - A formatação da tabela deve ser feita através de CSS
+  - Existem outros pacotes que torna muito mais fácil a criação de tabelas
+  
+## Pander
+  - Um dos pacotes mais práticos que encontrei é o pander
+  - Vamos recuperar os dados da tabela cidade_sintese
+  
+```{r}
+  conCurso <- dbConnect(PostgreSQL(), user= "r_workflow", password="curso",
+                        dbname="r_workflow",host="143.107.205.218",port='5432')
+  sSql <- "select * from s3672792.cidade_sintese"
+  dCidade <- dbGetQuery(conCurso, sSql)
+```
+
+## Pander
+  - Vamos plotar uma tabela com o codigo do município e seu nome
+```{r,warning=F}
+  library('pander')
+  dTemp <- head(dCidade[,c('codmun','nome')])
+  pander(dTemp)
+```
+
+## Pander
+  - Podemos mudar o alinhamento com o comando justify
+```{r,warning=F}
+  pander(dTemp,justify=c('center','left') )
+```
+
+## Pander
+  - Para renomear as colunas, basta renomear o dataframe
+  - Também podemos colocar um título em nossa tabela
+```{r,warning=F}
+  names(dTemp) <- c('Cód. IBGE','Nome')
+  pander(dTemp,justify=c('center','left'),caption='Municípios' )
+```
+
+## Pander
+  - Outras funcionalidades do Pander:
+    + [http://rapporter.github.io/pander/](http://rapporter.github.io/pander/)
+  - Para quem for trabalhar com $LaTeX$ recomendo utilizar a função xtable, com only.contents=TRUE
+    + \\begin{tabular}
+    + print(xtable(dTemp),only.contents=TRUE)
+    + \\end{tabular}
+  - Da mesma forma, quem for trabalhar com tabelas dinâmicas (sem saber a formatação prévia), recomendo utilizar o pacote longtabu do $LaTeX$
+  
+## Inserindo comandos de R
+  - Para inserirmos comandos de R, basta criarmos um chunk de código, especificando a linguagem (no caso, R)
+  
+ > \`\`\`{r}  
+  > x = rnorm(10)  
+  > x  
+  > \`\`\`    
+  
+  
+```{r,echo=F}
+  x = ?rnorm(10)
+  x
+```
+
+## Principais parâmetros do chunk de código
+  - Podemos passar alguns parâmetros úteis nos chunks:
+    + eval: se FALSE, o knitr não avaliará o chunk
+    + include: se FALSE, executa o chunk, mas não coloca no documento final
+    + echo: se FALSE, não exibe o código, apenas o resultado final
+    + results: se 'asis', exibe o código sem formatação de markup (por exemplo, quando queremos retornar um código de tabela em $LaTeX$)
+    + error,message,warning: se FALSE, não exibe erros, mensagens ou avisos ao executar o código
+    + cache: se TRUE,  o chunk não será recompilado, até ser alterado
+    
+## Principais parâmetros do chunk de código
+  - Opções para figuras:
+    + fig.align: 'left','right','center','default'
+    + fig.cap: Título da imagem, em $LaTeX$
+    + fig.lp: prefixo do label da imagem em $LaTeX$
+    + fig.width: largura da imagem
+    + fig.height: altura da imagem
+  - Obs: prefiram usar comandos específicos do output
+    
+## Plotando gráficos com R
+  - Para plotarmos os gráficos em nossos documentos, basta chamar a função plot ou ggplot dentro do chunk de código
+
+```{r}
+  plot(rnorm(100))
+```
+
+
+## Outras linguagens aceitas pelo RMarkdown
+  * Podemos criar chunks com:
+    + Python
+    + **SQL**
+    + Bash
+    + Rcpp
+    + Stan
+    + Javascript
+    + Css
+
+## Exemplo com SQL{.small}
+
+> \`\`\`{sql, connection=conCurso}  
+>   select * from s3672792.cidade_sintese  
+> \`\`\`
+
+```{sql, connection=conCurso,echo=F}
+  select * from s3672792.cidade_sintese
+```
+
+## Exemplo com SQL
+  * Por padrão o comando exibe os 10 primeiros resultados em tela
+    + Podemos alterar isso com o max.print: \`\`\`{sql, connection=conCurso, max.print = 20}
+    + max.print = -1 é ilimitado
+  * Para alterar o caption:
+    + tab.cap = 'Título da tabela
+    + tab.cap = NA - para ficar sem título
+  * Para armazenar o resultado em um dataframe
+    + output.var="dCidade"
+    + Ao usar output.var, o resultado não é impresso no documento
+  * Para usar variáveis do R, utilize a sintaxe **?**
+    + select * from s3672792.sintese_cidades where codmun = ?iCodMun
+
+## Últimas considerações
+  * Para atribuir uma conexão padrão:
+    + knitr::opts_chunk$set(connection = "conCurso")
+
+  * Apesar de ser possível, previsa utilizar o comando css no header YAML
+
+# Geração de páginas com Shiny
+
+## O que é o Shiny?
+  - O Shiny ([https://shiny.rstudio.com/](https://shiny.rstudio.com/)) é um framework de desenvolvimento WEB com R
+  - A documentação na página é MUITO BOA, recomendo
+  - Você pode utilizar a galeria para se inspirar
+  - Você pode criar páginas, sem saber (quase) nada de HTML
+  
+## Criando uma página com Shiny
+  - Existem 2 modos principais de se criar uma aplicação com Shiny
+    + 2 arquivos: ui.R e server.R 
+    + 1 arquivo: app.R (mais fácil de manter, na minha opinião)
+  - Vamos criar nosso primeiro aplicativo com Shiny:
+    + File -> New File -> Shiny Web App
+    + Dêem um nome para sua aplicação
+    + Escolham Single file app
+    + Escolham um lugar para salvar
+  - No arquivo app.R que foi criado, cliquem em Run App
+  
+## Estrutura e organização do arquivo
+  - Parte UI (User Interface)
+    + Fluidpage
+    + titlePanel
+    + sidebarLayout
+    + sidebarPanel
+    + sliderInput
+    + mainPanel
+    + plotOutput
+    
+## Estrutura e organização do arquivo
+  - Parte Server 
+    + input e output
+    + renderPlot
+    
+## Executando a aplicação
+  - shinyApp
+    + shiny::runApp(display.mode="showcase")
+  - Start simple: vamos dar uma olhada nas funcionalidades de algumas aplicações na galeria do Shiny
+    + Kmeans example
+    + Word cloud
+    + DataTables Demo
+    + Widget Gallery
+    
+## Criando uma página de exemplo
+   - Vamos recuperar os dados da tabela cidade_sintese
+```{r}
+  conCurso <<- dbConnect(PostgreSQL(), user= "r_workflow", password="curso", dbname="r_workflow",host="143.107.205.218",port='5432')
+  sSql <- "select * from s3672792.cidade_sintese"
+  dCidade <- dbGetQuery(conCurso, sSql)
+```
+  - O objeto é, ao digitar o nome de uma cidade, fazer a busca e retornar os dados da mesma
+    - Scripts/shiny/Cidades
+    
+## Plotando um mapa interativo com Shiny
+    - Scripts/shiny/Mapa
+
+    
+  
+```{r, echo=F, include=F}
+  dbDisconnect(conCurso)
+```

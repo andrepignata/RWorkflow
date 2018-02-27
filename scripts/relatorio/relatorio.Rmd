@@ -1,0 +1,66 @@
+---
+title: "Relatório para cidade"
+author: "André Pignata"
+date: "February 27, 2018"
+output: 
+  pdf_document:
+     keep_tex: true
+header-includes:
+- \usepackage[brazilian]{babel}
+- \usepackage[utf8]{inputenc}
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 9999)
+library('RPostgreSQL')
+library(ggplot2)
+library(dplyr)
+con <- dbConnect(PostgreSQL(), dbname ="r_workflow",user="r_workflow",password="curso",host='143.107.205.218',port='5432')
+iCodIbge <- 150475
+dCidade <- dbGetQuery(con,paste0("select * from s3672792.cidade_sintese where codmun = ",iCodIbge))
+iPopTotal <- dCidade[1,'pop_homens']+dCidade[1,'pop_mulheres']
+
+dCidadeTotal <- dbGetQuery(con,paste0("select * from s3672792.cidade_sintese where pop_alfabetizada is not null"))
+dCidadeTotal <- na.omit(dCidadeTotal)
+r1 <- lm(dCidadeTotal$nro_estab_sus ~ dCidadeTotal$pop_alfabetizada+dCidadeTotal$pop_homens+dCidadeTotal$pop_mulheres)
+previsto <- predict(r1,dCidadeTotal[,c('pop_alfabetizada','pop_homens','pop_mulheres')],interval = 'predict')
+dCidadeTotal$previsto <- previsto[,'fit']
+```
+
+## Avaliação do número de estabelecimentos de saúde do SUS 
+
+Prezado(a) prefeito(a) da cidade de `r dCidade[1,'nome']`
+
+Seu município contava com uma população de `r iPopTotal` habitantes, sendo (`r round(dCidade[1,'pop_homens']/iPopTotal*100,2)`\% homens e `r round(dCidade[1,'pop_mulheres']/iPopTotal*100,2)`\% mulheres) em 2010.
+
+Com um total de `r dCidade[1,'nro_estab_sus']` estabelecimentos do SUS, a cidade está
+```{r, include=T,echo=F, results='asis'}
+  if (dCidadeTotal[dCidadeTotal$codmun == iCodIbge,'nro_estab_sus'] >= dCidadeTotal[dCidadeTotal$codmun == iCodIbge,'previsto']) {
+    cat(' \\textit{acima} ')
+  } else {
+    cat(' \\textit{abaixo} ')
+  }
+```
+da quantidade de estabelecimentos SUS, em relação à população alfabetizada e número de homens e mulheres.
+
+```{r, echo=F,include=T}
+dCidadeTotal <- na.omit(dCidadeTotal)
+dCidadeTotal <- dCidadeTotal %>% filter(nro_estab_sus < 200)
+dCidadeTotal <- dCidadeTotal %>% filter(pop_alfabetizada < 400000)
+ggplot()+
+  geom_point(data=dCidadeTotal,aes(x=nro_estab_sus,y=pop_alfabetizada,shape=3),size=.2)+
+  geom_smooth(data=dCidadeTotal, aes(x = nro_estab_sus, y = (pop_alfabetizada)),method='loess',col='magenta',size=.2)+
+  geom_point(data=dCidade,aes(x=nro_estab_sus,y=pop_alfabetizada,color=nome,shape=12),size=4)+
+  labs(title='Estabelecimentos SUS x População alfabetizada',x='Nro estabelecimentos SUS',y='População Alfabetizada')+
+  scale_shape_identity()+
+  scale_colour_manual(name = 'Cidade', values =c('blue'))+
+  theme(legend.position="bottom")
+
+
+  
+
+```
+
+
